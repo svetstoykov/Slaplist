@@ -48,17 +48,19 @@ public class Track
     public ICollection<CollectionTrack> CollectionTracks { get; set; } = [];
     
     
-    public string? YoutubeUrl => YoutubeVideoId != null 
-        ? $"https://www.youtube.com/watch?v={YoutubeVideoId}" 
+    public string? YoutubeUrl =>
+        this.YoutubeVideoId != null 
+        ? $"https://www.youtube.com/watch?v={this.YoutubeVideoId}" 
         : null;
     
-    public string? DiscogsUrl => DiscogsReleaseId != null 
-        ? $"https://www.discogs.com/release/{DiscogsReleaseId}" 
+    public string? DiscogsUrl =>
+        this.DiscogsReleaseId != null 
+        ? $"https://www.discogs.com/release/{this.DiscogsReleaseId}" 
         : null;
     
-    public int CollectionCount => CollectionTracks.Count;
+    public int CollectionCount => this.CollectionTracks.Count;
     
-    public bool NeedsEnrichment => LastEnrichedAt == null && !string.IsNullOrEmpty(Artist);
+    public bool NeedsEnrichment => this.LastEnrichedAt == null && !string.IsNullOrEmpty(this.Artist);
     
     /// <summary>
     /// Normalize artist name for matching.

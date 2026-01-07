@@ -23,6 +23,8 @@ builder.Services.AddDbContext<SlaplistDbContext>(options =>
 
 builder.Services.AddScoped<IYoutubeDiscoveryService, YoutubeDiscoveryService>();
 builder.Services.AddScoped<IRecommendationOrchestrator, RecommendationOrchestrator>();
+builder.Services.AddScoped<IQuotaService, QuotaService>();
+builder.Services.AddScoped<ITrackService, TrackService>();
 
 // Swagger/OpenAPI setup
 builder.Services.AddEndpointsApiExplorer();

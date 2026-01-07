@@ -51,27 +51,28 @@ public class Collection
     
     public ICollection<CollectionTrack> CollectionTracks { get; set; } = [];
     
-    public int StoredTrackCount => CollectionTracks.Count;
+    public int StoredTrackCount => this.CollectionTracks.Count;
     
     public bool NeedsSync(TimeSpan maxAge)
     {
-        if (LastSyncedAt == null) return true;
-        return DateTime.UtcNow - LastSyncedAt.Value > maxAge;
+        if (this.LastSyncedAt == null) return true;
+        return DateTime.UtcNow - this.LastSyncedAt.Value > maxAge;
     }
     
-    public bool NeedsSync(int days) => NeedsSync(TimeSpan.FromDays(days));
+    public bool NeedsSync(int days) => this.NeedsSync(TimeSpan.FromDays(days));
     
-    public string Url => Source switch
+    public string Url =>
+        this.Source switch
     {
-        CollectionSource.YouTube => $"https://www.youtube.com/playlist?list={ExternalId}",
-        CollectionSource.Discogs when Type == CollectionType.Collection 
-            => $"https://www.discogs.com/user/{ExternalId}/collection",
-        CollectionSource.Discogs when Type == CollectionType.Wantlist 
-            => $"https://www.discogs.com/user/{ExternalId}/wantlist",
-        CollectionSource.Discogs when Type == CollectionType.ForSale 
-            => $"https://www.discogs.com/seller/{ExternalId}/profile",
+        CollectionSource.YouTube => $"https://www.youtube.com/playlist?list={this.ExternalId}",
+        CollectionSource.Discogs when this.Type == CollectionType.Collection 
+            => $"https://www.discogs.com/user/{this.ExternalId}/collection",
+        CollectionSource.Discogs when this.Type == CollectionType.Wantlist 
+            => $"https://www.discogs.com/user/{this.ExternalId}/wantlist",
+        CollectionSource.Discogs when this.Type == CollectionType.ForSale 
+            => $"https://www.discogs.com/seller/{this.ExternalId}/profile",
         CollectionSource.Bandcamp 
-            => $"https://bandcamp.com/{ExternalId}",
-        _ => ExternalId
+            => $"https://bandcamp.com/{this.ExternalId}",
+        _ => this.ExternalId
     };
 }
