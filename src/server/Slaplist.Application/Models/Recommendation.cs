@@ -4,6 +4,7 @@ namespace Slaplist.Application.Models;
 
 public class RecommendationOptions
 {
+    public const string SectionName = nameof(RecommendationOptions);
     public int SearchCacheHours { get; set; } 
     public int CollectionSyncDays { get; set; } 
 }

@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Slaplist.Application.Data;
 using Slaplist.Application.Domain;
 using Slaplist.Application.Interfaces;
 using Slaplist.Application.Models;
-using Slaplist.Infrastructure.Data;
 
 namespace Slaplist.Application.Services;
 
@@ -46,9 +46,9 @@ public class RecommendationOrchestrator : IRecommendationOrchestrator
         CancellationToken cancellationToken = default)
     {
         var stats = new OrchestratorStats();
-        var trackScores = new Dictionary<int, TrackScore>();
-        var processedCollectionIds = new HashSet<int>();
-        var inputTrackIds = new HashSet<int>();
+        var trackScores = new Dictionary<Guid, TrackScore>();
+        var processedCollectionIds = new HashSet<Guid>();
+        var inputTrackIds = new HashSet<Guid>();
         
         foreach (var query in inputQueries)
         {
@@ -140,12 +140,13 @@ public class RecommendationOrchestrator : IRecommendationOrchestrator
             stats.CacheHits++;
 
             var wantedIds = cachedSearch.ResultCollectionIds.Take(maxCollections).ToList();
-            var collections = await this._db.Collections
+            var existingCollections = await this._db.Collections
                 .Where(c => wantedIds.Contains(c.Id))
-                .Include(c => c.CollectionTracks)!.ThenInclude(ct2 => ct2.Track)
+                .Include(c => c.CollectionTracks)
+                    .ThenInclude(ct2 => ct2.Track)
                 .ToListAsync(cancellationToken);
-            // Preserve cache order
-            return collections.OrderBy(c => wantedIds.IndexOf(c.Id)).ToList();
+
+            return existingCollections.OrderBy(c => wantedIds.IndexOf(c.Id)).ToList();
         }
 
         // Check quota
@@ -157,22 +158,22 @@ public class RecommendationOrchestrator : IRecommendationOrchestrator
 
         // Call YouTube API
         stats.ApiSearchCalls++;
-        var searchResult = await this._youtube.SearchPlaylistsAsync(query + " playlist", maxCollections, cancellationToken);
+        var searchResult = await this._youtube.SearchPlaylistsAsync(query, maxCollections, cancellationToken);
         await this.IncrementQuotaAsync(CollectionSource.YouTube, searchResult.QuotaUsed, searchCalls: 1, cancellationToken: cancellationToken);
 
-
         // Persist collections and cache search
-        var collections2 = new List<Collection>();
+        var collections = new List<Collection>();
 
         foreach (var playlistInfo in searchResult.Playlists)
         {
             var existing = await this._db.Collections
-                .Include(c => c.CollectionTracks)!.ThenInclude(ct2 => ct2.Track)
+                .Include(c => c.CollectionTracks)
+                    .ThenInclude(ct2 => ct2.Track)
                 .FirstOrDefaultAsync(c => c.Source == CollectionSource.YouTube && c.ExternalId == playlistInfo.PlaylistId, cancellationToken);
 
             if (existing != null)
             {
-                collections2.Add(existing);
+                collections.Add(existing);
             }
             else
             {
@@ -187,7 +188,7 @@ public class RecommendationOrchestrator : IRecommendationOrchestrator
                     ReportedTrackCount = playlistInfo.ItemCount ?? 0
                 };
                 this._db.Collections.Add(newCollection);
-                collections2.Add(newCollection);
+                collections.Add(newCollection);
             }
         }
 
@@ -195,7 +196,7 @@ public class RecommendationOrchestrator : IRecommendationOrchestrator
         await this._db.SaveChangesAsync(cancellationToken);
 
         // Cache the search
-        var collectionIds = collections2.Select(c => c.Id).ToList();
+        var collectionIds = collections.Select(c => c.Id).ToList();
         this._db.SearchCaches.Add(new SearchCache
         {
             Query = query,
@@ -209,7 +210,7 @@ public class RecommendationOrchestrator : IRecommendationOrchestrator
 
         await this._db.SaveChangesAsync(cancellationToken);
 
-        return collections2;
+        return collections;
     }
 
     /// <summary>
@@ -361,13 +362,13 @@ public class RecommendationOrchestrator : IRecommendationOrchestrator
 
     private async Task<bool> CanUseQuotaAsync(CollectionSource source, int unitsNeeded, CancellationToken cancellationToken)
     {
-        var tracker = await GetOrCreateTodayQuotaAsync(source, cancellationToken);
+        var tracker = await this.GetOrCreateTodayQuotaAsync(source, cancellationToken);
         return tracker.CanUse(unitsNeeded);
     }
 
     private async Task IncrementQuotaAsync(CollectionSource source, int units, int searchCalls = 0, int fetchCalls = 0, CancellationToken cancellationToken = default)
     {
-        var tracker = await GetOrCreateTodayQuotaAsync(source, cancellationToken);
+        var tracker = await this.GetOrCreateTodayQuotaAsync(source, cancellationToken);
         tracker.UnitsUsed += units;
         tracker.SearchCalls += searchCalls;
         tracker.FetchCalls += fetchCalls;

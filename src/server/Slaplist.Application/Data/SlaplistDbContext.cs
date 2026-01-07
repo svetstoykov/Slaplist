@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Slaplist.Application.Domain;
 
-namespace Slaplist.Infrastructure.Data;
+namespace Slaplist.Application.Data;
 
 public class SlaplistDbContext : DbContext
 {
@@ -90,8 +90,8 @@ public class SlaplistDbContext : DbContext
             e.Property(s => s.NormalizedQuery).HasMaxLength(500).IsRequired();
             
             // PostgreSQL arrays for result IDs
-            e.Property(s => s.ResultCollectionIds).HasColumnType("integer[]");
-            e.Property(s => s.ResultTrackIds).HasColumnType("integer[]");
+            e.Property(s => s.ResultCollectionIds).HasColumnType("uuid[]");
+            e.Property(s => s.ResultTrackIds).HasColumnType("uuid[]");
             
             e.HasIndex(s => new { s.NormalizedQuery, s.Source, s.SearchType, s.SearchedAt });
         });

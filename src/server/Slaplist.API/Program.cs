@@ -1,46 +1,114 @@
-using Slaplist.API;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Slaplist.Application.Data;
+using Slaplist.Application.Domain;
+using Slaplist.Application.Interfaces;
+using Slaplist.Application.Models;
+using Slaplist.Application.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+builder.Services.AddOptions<RecommendationOptions>()
+    .Bind(builder.Configuration.GetSection(RecommendationOptions.SectionName));
+builder.Services.AddOptions<YoutubeOptions>()
+    .Bind(builder.Configuration.GetSection(YoutubeOptions.SectionName));
+
+builder.Services.AddDbContext<SlaplistDbContext>(options =>
+{
+    var conn = builder.Configuration.GetConnectionString("Slaplist");
+    options.UseNpgsql(conn);
+});
+
+builder.Services.AddScoped<IYoutubeDiscoveryService, YoutubeDiscoveryService>();
+builder.Services.AddScoped<IRecommendationOrchestrator, RecommendationOrchestrator>();
+
+// Swagger/OpenAPI setup
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
 app.UseHttpsRedirection();
 
-var summaries = new[]
+using (var scope = app.Services.CreateScope())
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+    var db = scope.ServiceProvider.GetRequiredService<SlaplistDbContext>();
+    await db.Database.EnsureCreatedAsync();
+}
 
-app.MapGet("/weatherforecast", () =>
+app.MapGet("/health", () => Results.Ok(new { status = "ok", time = DateTime.UtcNow }))
+    .WithName("Health");
+
+app.MapGet("/catalog-stats", async (SlaplistDbContext db) =>
+{
+    var stats = new
     {
-        var forecast = Enumerable.Range(1, 5).Select(index =>
-                new WeatherForecast
-                (
-                    DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-                    Random.Shared.Next(-20, 55),
-                    summaries[Random.Shared.Next(summaries.Length)]
-                ))
-            .ToArray();
-        return forecast;
-    })
-    .WithName("GetWeatherForecast");
+        tracks = await db.Tracks.CountAsync(),
+        collections = await db.Collections.CountAsync(),
+        youtubeCollections = await db.Collections.CountAsync(c => c.Source == CollectionSource.YouTube)
+    };
+    return Results.Ok(stats);
+}).WithName("GetCatalogStats");
+
+app.MapGet("/quota", async (SlaplistDbContext db) =>
+{
+    var today = DateOnly.FromDateTime(DateTime.UtcNow);
+    var source = CollectionSource.YouTube;
+
+    var quota = await db.QuotaTrackers
+        .FirstOrDefaultAsync(q => q.Date == today && q.Source == source);
+
+    if (quota is null)
+    {
+        quota = new QuotaTracker
+        {
+            Date = today,
+            Source = source,
+            UnitsUsed = 0,
+            DailyLimit = QuotaTracker.GetDefaultLimit(source)
+        };
+        db.QuotaTrackers.Add(quota);
+        await db.SaveChangesAsync();
+    }
+
+    return Results.Ok(new
+    {
+        date = quota.Date,
+        source = quota.Source.ToString(),
+        unitsUsed = quota.UnitsUsed,
+        dailyLimit = quota.DailyLimit,
+        remaining = quota.Remaining,
+        usagePercent = quota.UsagePercent
+    });
+}).WithName("GetQuota");
+
+app.MapPost("/recommendations", async (
+    RecommendationRequest req,
+    IOptions<YoutubeOptions> ytOptions,
+    IRecommendationOrchestrator orchestrator,
+    CancellationToken ct) =>
+{
+    if (req?.Tracks is null || req.Tracks.Count == 0)
+        return Results.BadRequest(new { error = "Tracks list is required" });
+
+    if (string.IsNullOrWhiteSpace(ytOptions.Value.ApiKey))
+        return Results.BadRequest(new { error = "YouTube ApiKey is not configured." });
+
+    var result = await orchestrator.GetRecommendationsAsync(
+        req.Tracks,
+        req.CollectionsPerTrack ?? 5,
+        req.ResultsToReturn ?? 50,
+        ct);
+
+    return Results.Ok(result);
+}).WithName("GetRecommendations");
 
 app.Run();
 
-namespace Slaplist.API
-{
-    record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-    {
-        public int TemperatureF => 32 + (int)(this.TemperatureC / 0.5556);
-    }
-}
+record RecommendationRequest(List<string> Tracks, int? CollectionsPerTrack, int? ResultsToReturn);

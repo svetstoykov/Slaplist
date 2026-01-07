@@ -6,7 +6,7 @@ namespace Slaplist.Application.Domain;
 /// </summary>
 public class SearchCache
 {
-    public int Id { get; set; }
+    public Guid Id { get; set; }
     
     /// <summary>
     /// What was searched (original query).
@@ -46,12 +46,12 @@ public class SearchCache
     /// <summary>
     /// Collection IDs returned by this search.
     /// </summary>
-    public List<int> ResultCollectionIds { get; set; } = [];
+    public List<Guid> ResultCollectionIds { get; set; } = [];
     
     /// <summary>
     /// Track IDs returned by this search (for track searches).
     /// </summary>
-    public List<int> ResultTrackIds { get; set; } = [];
+    public List<Guid> ResultTrackIds { get; set; } = [];
     
     public bool IsExpired(TimeSpan maxAge) => DateTime.UtcNow - this.SearchedAt > maxAge;
     

@@ -1,20 +1,21 @@
 using Google.Apis.Services;
 using Google.Apis.YouTube.v3;
+using Microsoft.Extensions.Options;
 using Slaplist.Application.Interfaces;
 using Slaplist.Application.Models;
 
-namespace Slaplist.Infrastructure.Services;
+namespace Slaplist.Application.Services;
 
 public class YoutubeDiscoveryService : IYoutubeDiscoveryService
 {
     private readonly YouTubeService _youtube;
 
-    public YoutubeDiscoveryService(string apiKey)
+    public YoutubeDiscoveryService(IOptions<YoutubeOptions> youtubeOptions)
     {
         this._youtube = new YouTubeService(new BaseClientService.Initializer
         {
-            ApiKey = apiKey,
-            ApplicationName = "Slaplist"
+            ApiKey = youtubeOptions.Value.ApiKey,
+            ApplicationName = youtubeOptions.Value.ApplicationName
         });
     }
 
@@ -98,10 +99,8 @@ public class YoutubeDiscoveryService : IYoutubeDiscoveryService
             }
             catch (Google.GoogleApiException ex) when (ex.HttpStatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                // Playlist doesn't exist or is private
                 break;
             }
-
         } while (nextPageToken != null);
 
         return new YoutubePlaylistResult(

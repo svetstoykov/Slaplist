@@ -5,10 +5,10 @@ namespace Slaplist.Application.Domain;
 /// </summary>
 public class CollectionTrack
 {
-    public int CollectionId { get; set; }
+    public Guid CollectionId { get; set; }
     public Collection Collection { get; set; } = null!;
     
-    public int TrackId { get; set; }
+    public Guid TrackId { get; set; }
     public Track Track { get; set; } = null!;
     
     /// <summary>

@@ -8,7 +8,7 @@ namespace Slaplist.Application.Domain;
 /// </summary>
 public class QuotaTracker
 {
-    public int Id { get; set; }
+    public Guid Id { get; set; }
     
     public DateOnly Date { get; set; }
     

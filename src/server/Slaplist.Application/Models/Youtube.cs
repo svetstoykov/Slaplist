@@ -28,3 +28,11 @@ public record YoutubeTrackInfo(
     string? ThumbnailUrl,
     int? DurationSeconds
 );
+
+public class YoutubeOptions
+{
+    public const string SectionName = nameof(YoutubeOptions);
+    
+    public string ApiKey { get; set; }
+    public string ApplicationName { get; set; }
+}

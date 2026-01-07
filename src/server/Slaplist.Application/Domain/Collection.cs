@@ -6,7 +6,7 @@ namespace Slaplist.Application.Domain;
 /// </summary>
 public class Collection
 {
-    public int Id { get; set; }
+    public Guid Id { get; set; }
     
     public CollectionSource Source { get; set; }
     public CollectionType Type { get; set; }

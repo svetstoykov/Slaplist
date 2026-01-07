@@ -8,7 +8,7 @@ namespace Slaplist.Application.Domain;
 /// </summary>
 public class Track
 {
-    public int Id { get; set; }
+    public Guid Id { get; set; }
     
     public string Artist { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
