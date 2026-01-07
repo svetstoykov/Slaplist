@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Slaplist.API.Mapping;
+using Slaplist.API.Models;
 using Slaplist.Application.Data;
 using Slaplist.Application.Domain;
 using Slaplist.Application.Interfaces;
@@ -105,10 +107,8 @@ app.MapPost("/recommendations", async (
         req.CollectionsPerTrack ?? 5,
         req.ResultsToReturn ?? 50,
         ct);
-
-    return Results.Ok(result);
+    
+    return Results.Ok(RecommendationMapper.ToRecommendationResponse(result));
 }).WithName("GetRecommendations");
 
 app.Run();
-
-record RecommendationRequest(List<string> Tracks, int? CollectionsPerTrack, int? ResultsToReturn);

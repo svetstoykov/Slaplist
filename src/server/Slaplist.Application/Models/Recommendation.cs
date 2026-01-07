@@ -34,5 +34,3 @@ public class OrchestratorStats
     public int TotalApiCalls => this.ApiSearchCalls + this.ApiFetchCalls;
     public int EstimatedQuotaUsed => (this.ApiSearchCalls * 100) + (this.ApiFetchCalls * 3);
 }
-
-public record ProgressUpdate(string Message, bool IsDetail = false);
