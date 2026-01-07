@@ -1,6 +1,7 @@
 using Google.Apis.Services;
 using Google.Apis.YouTube.v3;
 using Microsoft.Extensions.Options;
+using Slaplist.Application.Common;
 using Slaplist.Application.Interfaces;
 using Slaplist.Application.Models;
 
@@ -39,7 +40,7 @@ public class YoutubeDiscoveryService : IYoutubeDiscoveryService
             ))
             .ToList();
 
-        return new YoutubeSearchResult(playlists, QuotaUsed: 100);
+        return new YoutubeSearchResult(playlists, QuotaUsed: YoutubeConstants.SearchListUnitCost);
     }
 
     public async Task<YoutubePlaylistResult> GetPlaylistTracksAsync(string playlistId, CancellationToken ct = default)
@@ -47,21 +48,6 @@ public class YoutubeDiscoveryService : IYoutubeDiscoveryService
         var tracks = new List<YoutubeTrackInfo>();
         string? nextPageToken = null;
         var quotaUsed = 0;
-        var title = "";
-        string? channelTitle = null;
-
-        // Get playlist details first
-        var detailsRequest = this._youtube.Playlists.List("snippet");
-        detailsRequest.Id = playlistId;
-        var detailsResponse = await detailsRequest.ExecuteAsync(ct);
-        quotaUsed++; // Playlist.list costs 1 unit
-
-        var playlistDetails = detailsResponse.Items.FirstOrDefault();
-        if (playlistDetails != null)
-        {
-            title = playlistDetails.Snippet.Title;
-            channelTitle = playlistDetails.Snippet.ChannelTitle;
-        }
 
         // Fetch all tracks
         do
@@ -74,7 +60,7 @@ public class YoutubeDiscoveryService : IYoutubeDiscoveryService
             try
             {
                 var response = await request.ExecuteAsync(ct);
-                quotaUsed++; // PlaylistItems.list costs 1 unit per page
+                quotaUsed += YoutubeConstants.ListPlaylistItemsUnitCost;
 
                 foreach (var item in response.Items)
                 {
@@ -105,8 +91,6 @@ public class YoutubeDiscoveryService : IYoutubeDiscoveryService
 
         return new YoutubePlaylistResult(
             PlaylistId: playlistId,
-            Title: title,
-            ChannelTitle: channelTitle,
             Tracks: tracks,
             QuotaUsed: quotaUsed
         );

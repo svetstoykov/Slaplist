@@ -15,8 +15,6 @@ public record YoutubePlaylistInfo(
 
 public record YoutubePlaylistResult(
     string PlaylistId,
-    string Title,
-    string? ChannelTitle,
     List<YoutubeTrackInfo> Tracks,
     int QuotaUsed
 );
@@ -32,7 +30,6 @@ public record YoutubeTrackInfo(
 public class YoutubeOptions
 {
     public const string SectionName = nameof(YoutubeOptions);
-    
     public string ApiKey { get; set; }
     public string ApplicationName { get; set; }
 }

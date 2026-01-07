@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Slaplist.Application.Common;
 using Slaplist.Application.Data;
 using Slaplist.Application.Domain;
 using Slaplist.Application.Interfaces;
@@ -54,26 +55,26 @@ public class RecommendationOrchestrator : IRecommendationOrchestrator
 
                 await this.EnsureCollectionSyncedAsync(collection, stats, cancellationToken);
 
-                foreach (var ct in collection.CollectionTracks)
+                foreach (var collectionTrack in collection.CollectionTracks)
                 {
-                    if (inputTrackIds.Contains(ct.TrackId)) continue;
+                    if (inputTrackIds.Contains(collectionTrack.TrackId)) continue;
 
-                    if (this._tracksService.IsInputTrack(ct.Track, inputQueries))
+                    if (this._tracksService.IsInputTrack(collectionTrack.Track, inputQueries))
                     {
-                        inputTrackIds.Add(ct.TrackId);
+                        inputTrackIds.Add(collectionTrack.TrackId);
                         continue;
                     }
 
-                    if (trackScores.TryGetValue(ct.TrackId, out var score))
+                    if (trackScores.TryGetValue(collectionTrack.TrackId, out var score))
                     {
                         score.Frequency++;
                         score.FoundInCollections.Add(collection.Title);
                     }
                     else
                     {
-                        trackScores[ct.TrackId] = new TrackScore
+                        trackScores[collectionTrack.TrackId] = new TrackScore
                         {
-                            Track = ct.Track,
+                            Track = collectionTrack.Track,
                             Frequency = 1,
                             FoundInCollections = [collection.Title]
                         };
@@ -114,13 +115,13 @@ public class RecommendationOrchestrator : IRecommendationOrchestrator
             var wantedIds = cachedSearch.ResultCollectionIds.Take(maxCollections).ToList();
             var collections = await this._db.Collections
                 .Where(c => wantedIds.Contains(c.Id))
-                .Include(c => c.CollectionTracks).ThenInclude(ct => ct.Track)
+                .Include(c => c.CollectionTracks).ThenInclude(collectionTracks => collectionTracks.Track)
                 .ToListAsync(ct);
 
             return collections.OrderBy(c => wantedIds.IndexOf(c.Id)).ToList();
         }
 
-        if (!await this._quotaService.CanUseQuotaAsync(CollectionSource.YouTube, 100, ct))
+        if (!await this._quotaService.CanUseQuotaAsync(CollectionSource.YouTube, YoutubeConstants.SearchListUnitCost, ct))
         {
             stats.QuotaBlocked++;
             return [];
@@ -134,7 +135,7 @@ public class RecommendationOrchestrator : IRecommendationOrchestrator
         foreach (var playlist in searchResult.Playlists)
         {
             var existing = await this._db.Collections
-                .Include(c => c.CollectionTracks).ThenInclude(ct => ct.Track)
+                .Include(c => c.CollectionTracks).ThenInclude(collection => collection.Track)
                 .FirstOrDefaultAsync(c => c.Source == CollectionSource.YouTube && c.ExternalId == playlist.PlaylistId, ct);
 
             if (existing != null)
@@ -182,7 +183,7 @@ public class RecommendationOrchestrator : IRecommendationOrchestrator
             return;
         }
 
-        if (!await this._quotaService.CanUseQuotaAsync(CollectionSource.YouTube, 5, ct))
+        if (!await this._quotaService.CanUseQuotaAsync(CollectionSource.YouTube, YoutubeConstants.RecommendedQuotaNeededForListPlaylistItems, ct))
         {
             stats.QuotaBlocked++;
             return;
@@ -192,8 +193,6 @@ public class RecommendationOrchestrator : IRecommendationOrchestrator
         var result = await this._youtube.GetPlaylistTracksAsync(collection.ExternalId, ct);
         await this._quotaService.IncrementQuotaAsync(CollectionSource.YouTube, result.QuotaUsed, fetchCalls: 1, ct: ct);
 
-        collection.Title = result.Title;
-        collection.OwnerName = result.ChannelTitle;
         collection.LastSyncedAt = DateTime.UtcNow;
         collection.SyncComplete = true;
         collection.ReportedTrackCount = result.Tracks.Count;
