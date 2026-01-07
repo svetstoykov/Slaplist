@@ -29,7 +29,9 @@ public class OrchestratorStats
     public int ApiSearchCalls { get; set; }
     public int ApiFetchCalls { get; set; }
     public int CacheHits { get; set; }
-    public int QuotaBlocked { get; set; }
+    public int NotEnoughQuota { get; set; }
+    
+    public int QuotaUsed { get; set; }
 
     public int TotalApiCalls => this.ApiSearchCalls + this.ApiFetchCalls;
     public int EstimatedQuotaUsed => (this.ApiSearchCalls * 100) + (this.ApiFetchCalls * 3);

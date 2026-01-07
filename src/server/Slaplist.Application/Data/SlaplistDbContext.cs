@@ -12,7 +12,7 @@ public class SlaplistDbContext : DbContext
     public DbSet<CollectionTrack> CollectionTracks => this.Set<CollectionTrack>();
     public DbSet<SearchCache> SearchCaches => this.Set<SearchCache>();
     public DbSet<QuotaTracker> QuotaTrackers => this.Set<QuotaTracker>();
-
+    public DbSet<QueryStatistic> QueryStatistics => this.Set<QueryStatistic>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

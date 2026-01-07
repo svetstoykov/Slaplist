@@ -12,7 +12,7 @@ public interface IYoutubeDiscoveryService
     /// Returns playlist metadata (not tracks).
     /// Cost: 100 quota units.
     /// </summary>
-    Task<YoutubeSearchResult> SearchPlaylistsAsync(string query, int maxResults = 10, CancellationToken ct = default);
+    Task<YoutubeSearchResult> SearchPlaylistsAsync(string query, int maxResults = 10, List<string>? excludeNames = null, CancellationToken ct = default);
     
     /// <summary>
     /// Fetch all tracks from a playlist.

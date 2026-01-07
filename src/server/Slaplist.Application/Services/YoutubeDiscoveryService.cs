@@ -20,12 +20,23 @@ public class YoutubeDiscoveryService : IYoutubeDiscoveryService
         });
     }
 
-    public async Task<YoutubeSearchResult> SearchPlaylistsAsync(string query, int maxResults = 10, CancellationToken ct = default)
+    public async Task<YoutubeSearchResult> SearchPlaylistsAsync(string query, int maxResults = 10, List<string>? excludeNames = null, CancellationToken ct = default)
     {
+        var apiQuery = query;
+        if (excludeNames != null)
+        {
+            foreach (var name in excludeNames)
+            {
+                // If the name has spaces, wrap it in escaped quotes: -"some name"
+                var formattedExclusion = name.Contains(' ') ? $"-\"{name}\"" : $"-{name}";
+                apiQuery += $" {formattedExclusion}";
+            }
+        }
+        
         var request = this._youtube.Search.List("snippet");
-        request.Q = query;
+        request.Q = apiQuery;
         request.Type = "playlist";
-        request.MaxResults = Math.Min(maxResults, 50);
+        request.MaxResults = maxResults + (excludeNames?.Count ?? 0);
 
         var response = await request.ExecuteAsync(ct);
 
@@ -38,6 +49,7 @@ public class YoutubeDiscoveryService : IYoutubeDiscoveryService
                 ThumbnailUrl: item.Snippet.Thumbnails?.Medium?.Url ?? item.Snippet.Thumbnails?.Default__?.Url,
                 ItemCount: null // Not available in search results
             ))
+            .Where(p => excludeNames == null || !excludeNames.Any(ex => p.Title.Equals(ex, StringComparison.OrdinalIgnoreCase)))
             .ToList();
 
         return new YoutubeSearchResult(playlists, QuotaUsed: YoutubeConstants.SearchListUnitCost);
@@ -48,7 +60,8 @@ public class YoutubeDiscoveryService : IYoutubeDiscoveryService
         var tracks = new List<YoutubeTrackInfo>();
         string? nextPageToken = null;
         var quotaUsed = 0;
-
+        var fetchCalls = 0;
+        
         // Fetch all tracks
         do
         {
@@ -60,6 +73,8 @@ public class YoutubeDiscoveryService : IYoutubeDiscoveryService
             try
             {
                 var response = await request.ExecuteAsync(ct);
+                
+                fetchCalls++;
                 quotaUsed += YoutubeConstants.ListPlaylistItemsUnitCost;
 
                 foreach (var item in response.Items)
@@ -92,7 +107,8 @@ public class YoutubeDiscoveryService : IYoutubeDiscoveryService
         return new YoutubePlaylistResult(
             PlaylistId: playlistId,
             Tracks: tracks,
-            QuotaUsed: quotaUsed
+            QuotaUsed: quotaUsed,
+            FetchCalls: fetchCalls
         );
     }
 }

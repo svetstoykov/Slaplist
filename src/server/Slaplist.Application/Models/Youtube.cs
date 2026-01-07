@@ -16,7 +16,8 @@ public record YoutubePlaylistInfo(
 public record YoutubePlaylistResult(
     string PlaylistId,
     List<YoutubeTrackInfo> Tracks,
-    int QuotaUsed
+    int QuotaUsed,
+    int FetchCalls
 );
 
 public record YoutubeTrackInfo(

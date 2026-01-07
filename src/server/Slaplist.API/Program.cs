@@ -17,7 +17,7 @@ builder.Services.AddOptions<YoutubeOptions>()
 
 builder.Services.AddDbContext<SlaplistDbContext>(options =>
 {
-    var conn = builder.Configuration.GetConnectionString("Slaplist");
+    var conn = builder.Configuration.GetConnectionString("DefaultConnection");
     options.UseNpgsql(conn);
 });
 
