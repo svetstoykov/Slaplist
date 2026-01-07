@@ -4,8 +4,8 @@ namespace Slaplist.Application.Models;
 
 public class RecommendationOptions
 {
-    public int CollectionsPerTrack { get; set; } = 5;
-    public int ResultsToReturn { get; set; } = 50;
+    public int SearchCacheHours { get; set; } 
+    public int CollectionSyncDays { get; set; } 
 }
 
 public class RecommendationResult

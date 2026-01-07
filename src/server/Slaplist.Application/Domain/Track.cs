@@ -1,3 +1,5 @@
+using Slaplist.Application.Domain;
+
 namespace Slaplist.Application.Domain;
 
 /// <summary>
@@ -33,7 +35,7 @@ public class Track
     /// e.g., ["Surgeon - Force + Form", "Force + Form (Original Mix)", "unknown - track01"]
     /// </summary>
     public List<string> RawTitlesEncountered { get; set; } = [];
-    
+  
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     
@@ -42,20 +44,21 @@ public class Track
     /// Null means never enriched (only raw YouTube data).
     /// </summary>
     public DateTime? LastEnrichedAt { get; set; }
-
+    
     public ICollection<CollectionTrack> CollectionTracks { get; set; } = [];
-
-    public string? YoutubeUrl => this.YoutubeVideoId != null 
-        ? $"https://www.youtube.com/watch?v={this.YoutubeVideoId}" 
+    
+    
+    public string? YoutubeUrl => YoutubeVideoId != null 
+        ? $"https://www.youtube.com/watch?v={YoutubeVideoId}" 
         : null;
     
-    public string? DiscogsUrl => this.DiscogsReleaseId != null 
-        ? $"https://www.discogs.com/release/{this.DiscogsReleaseId}" 
+    public string? DiscogsUrl => DiscogsReleaseId != null 
+        ? $"https://www.discogs.com/release/{DiscogsReleaseId}" 
         : null;
     
-    public int CollectionCount => this.CollectionTracks.Count;
+    public int CollectionCount => CollectionTracks.Count;
     
-    public bool NeedsEnrichment => this.LastEnrichedAt == null && !string.IsNullOrEmpty(this.Artist);
+    public bool NeedsEnrichment => LastEnrichedAt == null && !string.IsNullOrEmpty(Artist);
     
     /// <summary>
     /// Normalize artist name for matching.

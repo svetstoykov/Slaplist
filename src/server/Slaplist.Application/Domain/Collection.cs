@@ -36,7 +36,6 @@ public class Collection
     /// Track count as reported by the platform (may differ from actual stored tracks).
     /// </summary>
     public int ReportedTrackCount { get; set; }
-    
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     
@@ -52,50 +51,27 @@ public class Collection
     
     public ICollection<CollectionTrack> CollectionTracks { get; set; } = [];
     
-
-    public int StoredTrackCount => this.CollectionTracks.Count;
+    public int StoredTrackCount => CollectionTracks.Count;
     
     public bool NeedsSync(TimeSpan maxAge)
     {
-        if (this.LastSyncedAt == null) return true;
-        return DateTime.UtcNow - this.LastSyncedAt.Value > maxAge;
+        if (LastSyncedAt == null) return true;
+        return DateTime.UtcNow - LastSyncedAt.Value > maxAge;
     }
     
-    public bool NeedsSync(int days) => this.NeedsSync(TimeSpan.FromDays(days));
+    public bool NeedsSync(int days) => NeedsSync(TimeSpan.FromDays(days));
     
-    public string Url => this.Source switch
+    public string Url => Source switch
     {
-        CollectionSource.YouTube => $"https://www.youtube.com/playlist?list={this.ExternalId}",
-        CollectionSource.Discogs when this.Type == CollectionType.Collection 
-            => $"https://www.discogs.com/user/{this.ExternalId}/collection",
-        CollectionSource.Discogs when this.Type == CollectionType.Wantlist 
-            => $"https://www.discogs.com/user/{this.ExternalId}/wantlist",
-        CollectionSource.Discogs when this.Type == CollectionType.ForSale 
-            => $"https://www.discogs.com/seller/{this.ExternalId}/profile",
+        CollectionSource.YouTube => $"https://www.youtube.com/playlist?list={ExternalId}",
+        CollectionSource.Discogs when Type == CollectionType.Collection 
+            => $"https://www.discogs.com/user/{ExternalId}/collection",
+        CollectionSource.Discogs when Type == CollectionType.Wantlist 
+            => $"https://www.discogs.com/user/{ExternalId}/wantlist",
+        CollectionSource.Discogs when Type == CollectionType.ForSale 
+            => $"https://www.discogs.com/seller/{ExternalId}/profile",
         CollectionSource.Bandcamp 
-            => $"https://bandcamp.com/{this.ExternalId}",
-        _ => this.ExternalId
+            => $"https://bandcamp.com/{ExternalId}",
+        _ => ExternalId
     };
-}
-
-public enum CollectionSource
-{
-    YouTube = 1,
-    Discogs = 2,
-    Bandcamp = 3
-}
-
-public enum CollectionType
-{
-    // YouTube
-    Playlist = 1,
-    
-    // Discogs
-    Collection = 2,     // User's owned records
-    Wantlist = 3,       // User's wanted records
-    ForSale = 4,        // Seller's inventory
-    
-    // Bandcamp
-    Purchases = 5,      // User's bought tracks
-    Wishlist = 6        // User's saved-for-later
 }

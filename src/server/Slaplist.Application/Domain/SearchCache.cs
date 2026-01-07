@@ -53,10 +53,6 @@ public class SearchCache
     /// </summary>
     public List<int> ResultTrackIds { get; set; } = [];
     
-    // ─────────────────────────────────────────────────────────────────────
-    // HELPERS
-    // ─────────────────────────────────────────────────────────────────────
-    
     public bool IsExpired(TimeSpan maxAge) => DateTime.UtcNow - this.SearchedAt > maxAge;
     
     public bool IsExpired(int hours) => this.IsExpired(TimeSpan.FromHours(hours));
@@ -66,27 +62,4 @@ public class SearchCache
         if (string.IsNullOrWhiteSpace(query)) return string.Empty;
         return query.ToLowerInvariant().Trim();
     }
-}
-
-public enum SearchType
-{
-    /// <summary>
-    /// Search for playlists containing a track/query (YouTube).
-    /// </summary>
-    PlaylistSearch = 1,
-    
-    /// <summary>
-    /// Search for a track by name (Discogs, Bandcamp).
-    /// </summary>
-    TrackSearch = 2,
-    
-    /// <summary>
-    /// Search for users who own/want a specific release (Discogs).
-    /// </summary>
-    UserSearch = 3,
-    
-    /// <summary>
-    /// Search for sellers with a specific release (Discogs).
-    /// </summary>
-    SellerSearch = 4
 }
