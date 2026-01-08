@@ -4,6 +4,7 @@ using Slaplist.API.Mapping;
 using Slaplist.API.Models;
 using Slaplist.Application.Data;
 using Slaplist.Application.Domain;
+using Slaplist.Application.Helpers;
 using Slaplist.Application.Interfaces;
 using Slaplist.Application.Models;
 using Slaplist.Application.Services;
@@ -104,8 +105,10 @@ app.MapPost("/recommendations", async (
     if (string.IsNullOrWhiteSpace(ytOptions.Value.ApiKey))
         return Results.BadRequest(new { error = "YouTube ApiKey is not configured." });
 
+    var trackIds = req.Tracks.Select(t => YoutubeHelper.ExtractVideoId(t)).ToList();
+    
     var result = await orchestrator.GetRecommendationsAsync(
-        req.Tracks,
+        trackIds,
         req.CollectionsPerTrack ?? 5,
         req.ResultsToReturn ?? 50,
         ct);

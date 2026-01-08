@@ -105,10 +105,10 @@ public class Track
     public static (string Artist, string Title) ParseArtistTitle(string raw)
     {
         if (string.IsNullOrWhiteSpace(raw)) return ("Unknown", "Unknown");
-        
-        // Common separators: " - ", " – ", " — "
-        var separators = new[] { " - ", " – ", " — ", " | " };
-        
+    
+        // Common separators - order matters: check longer/more specific first
+        var separators = new[] { " -- ", " - ", " – ", " — ", " | ", "--" };
+    
         foreach (var sep in separators)
         {
             var idx = raw.IndexOf(sep, StringComparison.Ordinal);
@@ -116,12 +116,12 @@ public class Track
             {
                 var artist = raw[..idx].Trim();
                 var title = raw[(idx + sep.Length)..].Trim();
-                
+            
                 if (!string.IsNullOrEmpty(artist) && !string.IsNullOrEmpty(title))
                     return (artist, title);
             }
         }
-        
+    
         // Can't parse - treat whole thing as title
         return ("Unknown", raw.Trim());
     }

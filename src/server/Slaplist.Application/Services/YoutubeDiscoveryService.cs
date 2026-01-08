@@ -2,6 +2,7 @@ using Google.Apis.Services;
 using Google.Apis.YouTube.v3;
 using Microsoft.Extensions.Options;
 using Slaplist.Application.Common;
+using Slaplist.Application.Domain;
 using Slaplist.Application.Interfaces;
 using Slaplist.Application.Models;
 
@@ -19,13 +20,42 @@ public class YoutubeDiscoveryService : IYoutubeDiscoveryService
             ApplicationName = youtubeOptions.Value.ApplicationName
         });
     }
+    
+    public async Task<YoutubeSearchResult> SearchPlaylistsByVideoIdAsync(string videoId, int maxResults = 10, List<string>? excludedPlaylistNames = null, CancellationToken ct = default)
+    {
+        // First, get the video's metadata (costs 1 quota unit)
+        var videoRequest = this._youtube.Videos.List("snippet");
+        videoRequest.Id = videoId;
+        var videoResponse = await videoRequest.ExecuteAsync(ct);
+    
+        var video = videoResponse.Items.FirstOrDefault();
+        if (video == null)
+            return new YoutubeSearchResult([], QuotaUsed: 1);
+    
+        // Build a smarter query from the video's actual metadata
+        var channelName = video.Snippet.ChannelTitle;
+        var title = video.Snippet.Title;
+        
+        var (artist, songName) = Track.ParseArtistTitle(title);
 
-    public async Task<YoutubeSearchResult> SearchPlaylistsAsync(string query, int maxResults = 10, List<string>? excludeNames = null, CancellationToken ct = default)
+        var query = $"{title} playlist";
+        if (songName.Equals(title, StringComparison.OrdinalIgnoreCase))
+        {
+            // In the case of non-artist title, the metadata is bad enough that we can't search for playlists by title alone, so we add the channel name
+            // This is not an optimal solution, but it might provide better results than just searching for 'playlist'
+            query = $"{channelName} {query}";
+        }
+        
+        // Now search for playlists with this enriched query
+        return await this.SearchPlaylistsAsync(query, maxResults, excludedPlaylistNames, ct: ct);
+    }
+
+    public async Task<YoutubeSearchResult> SearchPlaylistsAsync(string query, int maxResults = 10, List<string>? excludedPlaylistNames = null, CancellationToken ct = default)
     {
         var apiQuery = query;
-        if (excludeNames != null)
+        if (excludedPlaylistNames != null)
         {
-            foreach (var name in excludeNames)
+            foreach (var name in excludedPlaylistNames)
             {
                 // If the name has spaces, wrap it in escaped quotes: -"some name"
                 var formattedExclusion = name.Contains(' ') ? $"-\"{name}\"" : $"-{name}";
@@ -36,7 +66,7 @@ public class YoutubeDiscoveryService : IYoutubeDiscoveryService
         var request = this._youtube.Search.List("snippet");
         request.Q = apiQuery;
         request.Type = "playlist";
-        request.MaxResults = maxResults + (excludeNames?.Count ?? 0);
+        request.MaxResults = maxResults + (excludedPlaylistNames?.Count ?? 0);
 
         var response = await request.ExecuteAsync(ct);
 
@@ -49,7 +79,7 @@ public class YoutubeDiscoveryService : IYoutubeDiscoveryService
                 ThumbnailUrl: item.Snippet.Thumbnails?.Medium?.Url ?? item.Snippet.Thumbnails?.Default__?.Url,
                 ItemCount: null // Not available in search results
             ))
-            .Where(p => excludeNames == null || !excludeNames.Any(ex => p.Title.Equals(ex, StringComparison.OrdinalIgnoreCase)))
+            .Where(p => excludedPlaylistNames == null || !excludedPlaylistNames.Any(ex => p.Title.Equals(ex, StringComparison.OrdinalIgnoreCase)))
             .ToList();
 
         return new YoutubeSearchResult(playlists, QuotaUsed: YoutubeConstants.SearchListUnitCost);

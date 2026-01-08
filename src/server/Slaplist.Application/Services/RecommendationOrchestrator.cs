@@ -6,6 +6,8 @@ using Slaplist.Application.Domain;
 using Slaplist.Application.Interfaces;
 using Slaplist.Application.Models;
 
+namespace Slaplist.Application.Services;
+
 public class RecommendationOrchestrator : IRecommendationOrchestrator
 {
     private readonly IYoutubeDiscoveryService _youtube;
@@ -31,21 +33,21 @@ public class RecommendationOrchestrator : IRecommendationOrchestrator
     }
 
     public async Task<RecommendationResult> GetRecommendationsAsync(
-        List<string> inputQueries,
+        List<string> trackIds,
         int collectionsPerTrack,
         int resultsToReturn,
         CancellationToken cancellationToken = default)
     {
-        var queryStatistic = new QueryStatistic() { InputQueries = inputQueries.ToArray(), StartedAt = DateTime.UtcNow};
+        var queryStatistic = new QueryStatistic() { InputQueries = trackIds.ToArray(), StartedAt = DateTime.UtcNow};
         var trackScores = new Dictionary<Guid, TrackScore>();
         var processedCollectionIds = new HashSet<Guid>();
         var inputTrackIds = new HashSet<Guid>();
 
-        foreach (var query in inputQueries)
+        foreach (var trackId in trackIds)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var collections = await this.DiscoverCollectionsAsync(query, collectionsPerTrack, queryStatistic, cancellationToken);
+            var collections = await this.DiscoverCollectionsAsync(trackId, collectionsPerTrack, queryStatistic, cancellationToken);
             var processed = 0;
 
             foreach (var collection in collections)
@@ -59,7 +61,7 @@ public class RecommendationOrchestrator : IRecommendationOrchestrator
                 {
                     if (inputTrackIds.Contains(collectionTrack.TrackId)) continue;
 
-                    if (this._tracksService.IsInputTrack(collectionTrack.Track, inputQueries))
+                    if (this._tracksService.IsInputTrack(collectionTrack.Track, trackIds))
                     {
                         inputTrackIds.Add(collectionTrack.TrackId);
                         continue;
@@ -103,14 +105,13 @@ public class RecommendationOrchestrator : IRecommendationOrchestrator
         };
     }
 
-    private async Task<List<Collection>> DiscoverCollectionsAsync(string query, int maxCollections, QueryStatistic stats, CancellationToken cancellationToken)
+    private async Task<List<Collection>> DiscoverCollectionsAsync(string trackId, int maxCollections, QueryStatistic stats, CancellationToken cancellationToken)
     {
-        var normalizedQuery = SearchCache.Normalize(query);
         var cutoff = DateTime.UtcNow - this._searchCacheMaxAge;
         var collectionsToReturn = new List<Collection>();
 
         var cachedSearch = await this._db.SearchCaches
-            .Where(s => s.NormalizedQuery == normalizedQuery && s.Source == CollectionSource.YouTube && s.SearchType == SearchType.PlaylistSearch &&
+            .Where(s => s.Query == trackId && s.Source == CollectionSource.YouTube && s.SearchType == SearchType.PlaylistSearch &&
                         s.SearchedAt > cutoff)
             .OrderByDescending(s => s.SearchedAt)
             .FirstOrDefaultAsync(cancellationToken);
@@ -129,7 +130,7 @@ public class RecommendationOrchestrator : IRecommendationOrchestrator
 
         var cachedCollections = await this._db.Collections
             .Where(c => c.Source == CollectionSource.YouTube &&
-                        c.CollectionTracks.Any(collectionTrack => collectionTrack.Track.RawTitlesEncountered.Contains(query)))
+                        c.CollectionTracks.Any(collectionTrack => collectionTrack.Track.YoutubeVideoId == trackId))
             .Include(c => c.CollectionTracks)
             .ThenInclude(collectionTrack => collectionTrack.Track)
             .ToListAsync(cancellationToken);
@@ -151,8 +152,7 @@ public class RecommendationOrchestrator : IRecommendationOrchestrator
         }
 
         stats.ApiSearchCalls++;
-        var searchResult =
-            await this._youtube.SearchPlaylistsAsync(query, maxCollections, cachedCollections.Select(cc => cc.Title).ToList(), cancellationToken);
+        var searchResult = await this._youtube.SearchPlaylistsByVideoIdAsync(trackId, maxCollections, cachedCollections.Select(cc => cc.Title).ToList(), cancellationToken);
         await this._quotaService.IncrementQuotaAsync(CollectionSource.YouTube, searchResult.QuotaUsed, searchCalls: 1, ct: cancellationToken);
 
         foreach (var playlist in searchResult.Playlists)
@@ -187,8 +187,7 @@ public class RecommendationOrchestrator : IRecommendationOrchestrator
         await this._db.SaveChangesAsync(cancellationToken);
         this._db.SearchCaches.Add(new SearchCache
         {
-            Query = query,
-            NormalizedQuery = normalizedQuery,
+            Query = trackId,
             Source = CollectionSource.YouTube,
             SearchType = SearchType.PlaylistSearch,
             ResultCount = searchResult.Playlists.Count,
@@ -221,21 +220,23 @@ public class RecommendationOrchestrator : IRecommendationOrchestrator
         stats.ApiFetchCalls++;
         var result = await this._youtube.GetPlaylistTracksAsync(collection.ExternalId, cancellationToken);
         await this._quotaService.IncrementQuotaAsync(CollectionSource.YouTube, result.QuotaUsed, fetchCalls: result.FetchCalls, ct: cancellationToken);
+        
+        collection.CollectionTracks.Clear();
+        
+        var uniqueVideoIds = result.Tracks.DistinctBy(t => t.VideoId).ToArray();
+        for (var index = 0; index < uniqueVideoIds.Length; index++)
+        {
+            var trackInfo = uniqueVideoIds[index];
+            if (trackInfo.RawTitle is "Deleted video" or "Private video") continue;
+
+            var track = await this._tracksService.FindOrCreateTrackAsync(trackInfo, cancellationToken);
+            collection.CollectionTracks.Add(new CollectionTrack { Track = track, Position = index + 1, DiscoveredAt = DateTime.UtcNow });
+        }
 
         collection.LastSyncedAt = DateTime.UtcNow;
         collection.SyncComplete = true;
         collection.ReportedTrackCount = result.Tracks.Count;
-        collection.CollectionTracks.Clear();
-
-        var position = 0;
-        foreach (var trackInfo in result.Tracks)
-        {
-            if (trackInfo.RawTitle is "Deleted video" or "Private video") continue;
-
-            var track = await this._tracksService.FindOrCreateTrackAsync(trackInfo, cancellationToken);
-            collection.CollectionTracks.Add(new CollectionTrack { Track = track, Position = position++, DiscoveredAt = DateTime.UtcNow });
-        }
-
+        
         stats.QuotaUsed += result.QuotaUsed;
 
         await this._db.SaveChangesAsync(cancellationToken);
